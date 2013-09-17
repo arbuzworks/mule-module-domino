@@ -1,0 +1,7 @@
+user=User1
+password=talipwd
+
+host=10.10.88.123
+port=63148
+servername=10.10.88.123
+databasename=mail/user1.nsf

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xmlns:spring="http://www.springframework.org/schema/beans"
+      xmlns:domino="http://www.mulesoft.org/schema/mule/domino"
+      xmlns:context="http://www.springframework.org/schema/context"
+      xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+                          http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/3.1/mule.xsd
+                          http://www.mulesoft.org/schema/mule/domino http://www.mulesoft.org/schema/mule/domino/1.0/mule-domino.xsd
+                          http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd">
+
+	<context:property-placeholder location="test.properties"/>
+	
+	<domino:config host="${host}" port="${port}"/>
+
+    <flow name="createFlow">
+		<enricher>
+			<domino:create user="${user}" password="${password}" serverName="${servername}" databaseName="${databasename}">
+				<domino:properties>
+			       	<domino:property key="Subject" value="CREATED at now"/>
+				</domino:properties>
+			</domino:create>
+			<enrich target="#[variable:createId]"/>
+			<enrich target="#[variable:updateId]"/>
+		</enricher>	
+		<logger level="INFO" message="create id: #[variable:createId]" />
+
+		<domino:read user="${user}" password="${password}" serverName="${servername}" databaseName="${databasename}" id="#[variable:createId]" />		
+		<enricher target="#[variable:xml]">
+			<domino:read-dxl user="${user}" password="${password}" serverName="${servername}" databaseName="${databasename}" id="#[variable:createId]" />	
+		</enricher>
+		<logger level="INFO" message="read xml: #[variable:xml]" />
+		
+		<enricher target="#[variable:findResult]">
+			<domino:find user="${user}" password="${password}" serverName="${servername}" databaseName="${databasename}" query="Subject='CREATED at now'" />
+		</enricher>
+		<logger level="INFO" message="find: #[variable:findResult]" />
+		
+		<enricher target="#[variable:findDxlResult]">
+			<domino:find-dxl user="${user}" password="${password}" serverName="${servername}" databaseName="${databasename}" query="Subject='CREATED at now'" />
+		</enricher>
+		<logger level="INFO" message="find xml: #[variable:findDxlResult]" />
+
+		<logger level="INFO" message="before DxlToDocument: #[payload]" />
+		<custom-transformer class="org.mule.module.domino.transformers.DxlToDocument"/>
+		<logger level="INFO" message="after DxlToDocument and before DocumentToDxl: #[payload]" />
+		<custom-transformer class="org.mule.module.domino.transformers.DocumentToDxl"/>
+		<logger level="INFO" message="after DocumentToDxl: #[payload]" />
+			
+		<enricher target="#[variable:deleteId]">
+			<domino:update user="${user}" password="${password}" serverName="${servername}" databaseName="${databasename}" id="#[variable:updateId]">
+				<domino:properties>
+			        	<domino:property key="Subject" value="UPDATED at now"/>
+				</domino:properties>
+			</domino:update>
+		</enricher>
+		<logger level="INFO" message="update id: #[variable:deleteId]"/>
+		
+		<enricher target="#[variable:updateResult]">
+			<domino:read-dxl user="${user}" password="${password}" serverName="${servername}" databaseName="${databasename}" id="#[variable:createId]" />	
+		</enricher>
+		<logger level="INFO" message="update result: #[variable:updateResult]" />
+		
+		<domino:import-dxl user="${user}" password="${password}" serverName="${servername}" databaseName="${databasename}" dxl="#[variable:xml]" replaceDbProperties="false" documentImportOption="9"/>
+		
+		<domino:delete user="${user}" password="${password}" serverName="${servername}" databaseName="${databasename}" id="#[variable:deleteId]" />
+		<logger level="INFO" message="delete result: #[payload]"/>
+	</flow>
+
+</mule>
